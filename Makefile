@@ -21,9 +21,14 @@ dirs:
 	mkdir -p $(BUILD_PATH)/var/syncserver
 	mkdir -p $(BUILD_PATH)/var/log/syncserver
 
-clean:
+fullclean:
 	rm -rf ebin
 	rm -rf $(BUILD_PATH)
+
+clean:
+	rm -rf ebin
+	rm -rf $(BUILD_PATH)/etc/init.d
+	rm -rf $(BUILD_PATH)/usr/
 
 install: build installfiles
 	echo "SyncServer\`s files are installed."
