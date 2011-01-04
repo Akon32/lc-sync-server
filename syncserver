@@ -1,8 +1,13 @@
 #!/bin/sh
 
-ERL_PATH=ebin
+test -z "${WORK_DIR}" && WORK_DIR=/
+cd ${WORK_DIR}
 
-CONFIG=syncserver.config
+ERL_PATH=usr/share/syncserver/ebin
+
+CONFIG_FILE=etc/syncserver/syncserver.config
+
+COOKIE_FILE=etc/syncserver/cookie
 
 SNAME="syncserver@$(uname -n)"
 
@@ -33,18 +38,32 @@ STOP_SCRIPT="
 	io:format(\"Shutdown this node~n\",[]),
 	init:stop()."
 
-COOKIE=$(cat cookie 2>/dev/null)
+CREATE_DB_SCRIPT="
+	try
+		io:format(\"Creating database...\",[]),
+		R=util:create_db(),
+		io:format(\" ~p~n\",[R])
+	after
+		init:stop()
+	end."
+
+COOKIE=$(cat ${COOKIE_FILE} 2>/dev/null)
 
 COOKIE_OPT="-setcookie '$COOKIE'"
 test -z $COOKIE && COOKIE_OPT=
 
-ERL_OPTIONS="-detached -pa $ERL_PATH -sname $SNAME -config $CONFIG $COOKIE_OPT"
-ERL_OPTIONS_SHELL="-pa $ERL_PATH -sname $SNAME -config $CONFIG $COOKIE_OPT"
-ERL_OPTIONS_STOP="-noshell -sname stop-syncserver -config $CONFIG $COOKIE_OPT"
+ERL_OPTIONS="-detached -pa $ERL_PATH -sname $SNAME 
+	-config ${CONFIG_FILE} $COOKIE_OPT"
+ERL_OPTIONS_SHELL="-pa $ERL_PATH -sname $SNAME 
+	-config ${CONFIG_FILE} $COOKIE_OPT"
+ERL_OPTIONS_STOP="-noshell -sname stop-syncserver 
+	-config ${CONFIG_FILE} $COOKIE_OPT"
+ERL_OPTIONS_CREATEDB="-noshell -pa $ERL_PATH -sname db-syncserver 
+	-config ${CONFIG_FILE} $COOKIE_OPT"
 
 case $1 in
 	start) 
-	    exec erl ${ERL_OPTIONS} -config $CONFIG -eval "$START_SCRIPT"
+	    exec erl ${ERL_OPTIONS} -eval "$START_SCRIPT"
 	;;
 	start-shell) 
 	    exec erl ${ERL_OPTIONS_SHELL} -eval "$START_SCRIPT"
@@ -52,10 +71,21 @@ case $1 in
 	stop)
 	    exec erl ${ERL_OPTIONS_STOP} -eval "$STOP_SCRIPT"
 	;;
+	create-db)
+	    exec erl ${ERL_OPTIONS_CREATEDB} -eval "$CREATE_DB_SCRIPT"
+	;;
+	create-cookie)
+		{ cat /dev/urandom|head -c32|md5sum|head -c32 > ${COOKIE_FILE}
+		} &&	chmod 400 ${COOKIE_FILE} &&	echo "Cookie file created."
+	;;
 	*)
-	    echo 'Usage:'
-	    echo ' ./syncserver start'
-	    echo ' ./syncserver start-shell'
-	    echo ' ./syncserver stop'
+		echo "Synchronization Server"
+	    echo "Usage:"
+	    echo " $0 start"
+	    echo " $0 start-shell"
+	    echo " $0 stop"
+	    echo " $0 create-db"
+	    echo " $0 create-cookie"
 	;;
 esac
+

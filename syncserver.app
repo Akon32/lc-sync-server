@@ -1,5 +1,5 @@
 {application, syncserver,
- [{description, "Syncronization Server" },
+ [{description, "Synchronization Server" },
   {vsn, "0.1.0" },
   {modules, [syncserver,net_interface,db_impl_mnesia,db_interface]},
   {registered,[connection_handlers,user_list,connection_receiver]},
