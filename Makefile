@@ -5,6 +5,8 @@ INSTALL_PATH=/
 
 SCRIPT=/etc/init.d/syncserver
 
+USER=syncserver
+
 build:	clean dirs
 	erl -make
 	cp -r ebin/* $(BUILD_PATH)/usr/share/syncserver/ebin/
@@ -30,21 +32,33 @@ clean:
 	rm -rf $(BUILD_PATH)/etc/init.d
 	rm -rf $(BUILD_PATH)/usr/
 
-install: build installfiles
+install: build installfiles mkuser
 	echo "SyncServer\`s files are installed."
+	update-rc.d syncserver defaults
 	echo "test.."
 	$(SCRIPT)
 	echo "You may create database and cookie file before starting server"
 
-installfiles: build
+installfiles: build 
 	cp -r $(BUILD_PATH)/* $(INSTALL_PATH)/
 
 uninstall:
 	rm -rf $(INSTALL_PATH)/usr/share/syncserver
 	rm -rf $(INSTALL_PATH)/etc/syncserver
 	rm -f  $(INSTALL_PATH)/etc/init.d/syncserver
+	update-rc.d syncserver remove
 
-purge:  uninstall
+purge:  uninstall rmuser
 	rm -rf $(INSTALL_PATH)/var/syncserver
 	rm -rf $(INSTALL_PATH)/var/log/syncserver
+
+mkuser:
+	adduser syncserver --group --system --home /var/syncserver/ --disabled-login
+	chown syncserver:syncserver /var/syncserver/
+	chmod 770 /var/syncserver/
+
+rmuser:
+	deluser syncserver || true
+
+
 

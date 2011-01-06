@@ -2,5 +2,5 @@
 
 test -z "$TARGET" && TARGET=target
 
-WORK_DIR=$TARGET $TARGET/etc/init.d/syncserver $*
+SYNCSERVERWORKDIR=$TARGET $TARGET/etc/init.d/syncserver $*
 
