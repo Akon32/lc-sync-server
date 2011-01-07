@@ -9,6 +9,21 @@ SyncServer - cервер хранения настроек приложений,
 
 Описания процессов сборки и запуска не окончательные и могут быть изменены.
 
+Краткая инструкция по установке на Debian (или Ubuntu).
+	Установка:
+sudo apt-get install git-core erlang make
+git clone git://github.com/Akon32/lc-sync-server.git
+cd lc-sync-server
+sudo make install
+sudo make fullclean
+sudo invoke-rc.d syncserver create-db
+sudo invoke-rc.d syncserver start
+	Сервер будет запускаться при старте системы.
+	Полное удаление:
+sudo invoke-rc.d syncserver stop
+cd lc-sync-server
+sudo make purge
+
 Сборка.
 	Для сборки выполните команды (из каталога lc-sync-server):
 make
