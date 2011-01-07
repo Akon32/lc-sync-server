@@ -1,108 +1,149 @@
-#!/bin/sh
-
-#TODO: использовать параметр --workdir для указания каталога
-test -z "$SYNCSERVERWORKDIR" && SYNCSERVERWORKDIR=/
-cd $SYNCSERVERWORKDIR
-
-#TODO: использовать параметр --no-su для запуска без su
-SYNCSERVERUSER=syncserver
-
-ASSYNCSERVER="su $SYNCSERVERUSER -c"
-#пока обойдемся без su
-ASSYNCSERVER=
+#!/bin/bash
 
 # не вынести ли это в /etc/default/syncserver ?
 ERL_PATH=usr/share/syncserver/ebin
 CONFIG_FILE=etc/syncserver/syncserver.config
 COOKIE_FILE=etc/syncserver/cookie
 SNAME="syncserver@`uname -n`"
-CONTROLSNAME="syncservercontrol`date +%s%N`"
+CONTROL_SNAME="syncserverctl"
 DATABASE_DIR=var/syncserver/database
+SYNCSERVER_USER=syncserver
 
-APPLIST="[sasl,mnesia,syncserver]"
+WORK_DIR=/
+
+print_help(){
+	echo "Synchronization Server control script"
+	echo "Usage:"
+	echo " $0 start|stop|status|reload|"
+	echo "    |force-reload|create-db|create-cookie  [--workdir DIR] [--no-su]"
+}
+
+if [ $# -eq 0 ] ; then
+	print_help
+	exit
+fi
+
+ARG1=$1
+
+shift
+
+while [ $# -gt 0 ]; do
+	case $1 in 
+		--no-su)
+			#echo "not using \"su\""
+			NO_SU=true
+		;;
+		--workdir)
+			shift
+			if [ -d "$1" ]; then
+				WORK_DIR="$1"
+				#echo "cd to directory \"$1\""
+			else 
+				echo "Wrong directory in option --workdir (\"$1\")"
+			fi
+		;;
+		*)
+			echo "Wrong argument: $1"
+	esac
+	shift
+done
+
+cd "$WORK_DIR"
 
 START_SCRIPT="
-	Node='$SNAME',
-	io:format(\"Starting Syncserver on node ~p..~n\",[Node]),
-	lists:foreach(fun(A)->
-			io:format(\"Starting application ~p.. \",[A]),
-			SR=rpc:call(Node,application,start,[A]),
-			io:format(\"~p~n\",[SR])
-			end, $APPLIST),
-	init:stop()."
+	Result=rpc:call('$SNAME',util,start,[]),
+	if	Result -> init:stop(0);
+		true -> init:stop(1)
+	end."
 
 STOP_SCRIPT="
-	Node='$SNAME',
-	io:format(\"Stopping Syncserver on node ~p..~n\",[Node]),
-	lists:foreach(fun(A)->
-			io:format(\"Stopping application ~p.. \",[A]),
-			SR=rpc:call(Node,application,stop,[A]),
-			io:format(\"~p~n\",[SR])
-			end, lists:reverse($APPLIST)),
-	io:format(\"Shutdown node ~p.. \",[Node]),
-	R=rpc:call(Node,init,stop,[]),
-	io:format(\"~p~n\",[R]),
-	init:stop()."
+	rpc:call('$SNAME',util,stop,[]),
+	init:stop(0)."
 
 STATUS_SCRIPT="
-	Node='$SNAME',
-	A=lists:last($APPLIST),
-	io:format(\"Checking Syncserver status on node ~p...\",[Node]),
-	Apps=rpc:call(Node,application,which_applications,[]),
-	Running=is_list(Apps) andalso lists:any(fun({X,_,_})-> X==A end,Apps),
-	{Text,Result}=if Running -> {\"running\",0};true->{\"not running\",1} end,
-	io:format(\" ~s~n\",[Text]),
-	init:stop(Result)."
+	Result=rpc:call('$SNAME',util,status,[]),
+	if	Result -> init:stop(0);
+		true -> init:stop(1)
+	end."
 
 CREATE_DB_SCRIPT="
-	io:format(\"Creating database...\",[]),
-	R=util:create_db(),
-	io:format(\" ~p~n\",[R]),
+	R=rpc:call('$SNAME',util,create_db,[]),
 	if	R==ok -> init:stop(0);
 		true -> init_stop(1)
 	end."
 
-COOKIE=$($ASSYNCSERVER cat ${COOKIE_FILE} 2>/dev/null)
+as_syncserver(){
+	if [ -z "$NO_SU" ]; then
+		su $SYNCSERVER_USER -- -c "$*"
+	else
+		bash -c "$*"
+	fi
+}
 
-COOKIE_OPT="-setcookie '$COOKIE'"
+COOKIE=$(as_syncserver "cat $COOKIE_FILE 2>/dev/null" )
+
+COOKIE_OPT="-setcookie $COOKIE"
 test -z $COOKIE && COOKIE_OPT=
 
-ERL_OPTIONS="-detached -pa $ERL_PATH -sname $SNAME -config ${CONFIG_FILE} $COOKIE_OPT"
-ERL_OPTIONS_CONTROL="-noshell -sname $CONTROLSNAME  $COOKIE_OPT"
-#возможно здесь надо указать $SNAME, а не $CONTROLSNAME
-ERL_OPTIONS_CREATEDB="-noshell -pa $ERL_PATH -sname $CONTROLSNAME -config ${CONFIG_FILE} $COOKIE_OPT"
+ERL_OPTIONS="-detached -pa $ERL_PATH -sname $SNAME -config $CONFIG_FILE $COOKIE_OPT"
+ERL_OPTIONS_CONTROL="-noshell -sname $CONTROL_SNAME $COOKIE_OPT"
+ERL_OPTIONS_CREATEDB="-noshell -pa $ERL_PATH -sname $CONTROL_SNAME -config $CONFIG_FILE $COOKIE_OPT"
 
 #запуск рабочего узла
 startnode(){
-	$ASSYNCSERVER erl ${ERL_OPTIONS}
+	as_syncserver "erl $ERL_OPTIONS"
 }
 
 # запуск контролирующего узла
-# $1 - выполняемый сценарий
+# $* - выполняемый сценарий
 ctl(){
-	erl ${ERL_OPTIONS_CONTROL} -eval "$1"
+	erl $ERL_OPTIONS_CONTROL -eval "$*"
 }
 
-status(){
-	ctl "${STATUS_SCRIPT}"
+#по сути stop_server делает то же..
+stopnode(){
+	ctl "rpc:call('$SNAME',init,stop,[]),init:stop()."
 }
+
+print_ok_fail(){
+	if [ "$1" -eq 0 ];then
+		echo " OK"
+	else
+		echo " FAIL"
+	fi
+	return $1
+}
+
+
+status(){
+	echo -n "Checking SyncServer status.."
+	ctl "$STATUS_SCRIPT"
+	R=$?
+	if [ "$R" -eq 0 ];then
+		echo " OK"
+	else
+		echo " not running"
+	fi
+	return $R
+}
+
 stop_server(){
 	echo -n "Stopping SyncServer.."	
-	if status>/dev/null; then 
-		ctl "${STOP_SCRIPT}">/dev/null
-		echo " OK"
+	if status >/dev/null; then 
+		ctl "$STOP_SCRIPT" >/dev/null
+		print_ok_fail "$?"
 	else 
 		echo " not running."
 	fi
 }
+
 start_server(){
 	echo -n "Starting SyncServer.."	
-	if status>/dev/null; then 
+	if status >/dev/null; then 
 		echo " already started."
 	else 
-		startnode
-		ctl "${START_SCRIPT}">/dev/null
-		echo " OK"
+		{ startnode && ctl "$START_SCRIPT" ; }>/dev/null
+		print_ok_fail "$?"
 	fi
 }
 
@@ -112,17 +153,26 @@ reload(){
 }
 
 create_db(){
+	echo -n "Creating database.."	
 	if status>/dev/null; then
-		echo "Syncserver must be stopped before creating database."
+		echo " FAIL: Syncserver is running"
 		return 1
-	else
-		$ASSYNCSERVER erl ${ERL_OPTIONS_CREATEDB} -eval "${CREATE_DB_SCRIPT}"
 	fi
+	#TODO: надо проверять дополнительно, не запущен ли узел $SNAME,
+	# или mnesia в каталоге mnesia dir..
+	# часто в этом месте erl падает
+	{ startnode && ctl "$CREATE_DB_SCRIPT" && stopnode ; } >/dev/null
+	print_ok_fail "$?"
 }
-
-case $1 in
+create_cookie(){
+	{ cat /dev/urandom|head -c32|md5sum|head -c32 > $COOKIE_FILE
+	} &&	chmod 440 $COOKIE_FILE && \
+		chown $SYNCSERVER_USER:$SYNCSERVER_USER $COOKIE_FILE && \
+		echo "Cookie file created."
+}
+case $ARG1 in
 	status)
-		status
+		status || true
 	;;
 	start) 
 		start_server
@@ -130,29 +180,27 @@ case $1 in
 	stop)
 	    stop_server
 	;;
-	reload)
-		reload
-	;;
-	force-reload)
+	reload|force-reload)
 		reload
 	;;
 	create-db)
 	    create_db
 	;;
+	create-cookie-force)
+	    create_cookie
+	;;
 	create-cookie)
-		{ cat /dev/urandom|head -c32|md5sum|head -c32 > ${COOKIE_FILE}
-		} &&	chmod 440 ${COOKIE_FILE} &&	echo "Cookie file created."
+		if [ -f $COOKIE_FILE ] ;then 
+			echo -n "Cookie file already exists, "
+			echo "try create-cookie-force to replace it"
+			exit 1
+		else
+			create_cookie
+		fi
 	;;
 	*)
-		echo "Synchronization Server control script"
-	    echo "Usage:"
-	    echo " $0 start"
-	    echo " $0 stop"
-	    echo " $0 status"
-	    echo " $0 reload"
-	    echo " $0 force-reload"
-	    echo " $0 create-db"
-	    echo " $0 create-cookie"
+		print_help
+		exit 1
 	;;
 esac
 

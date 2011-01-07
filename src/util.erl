@@ -1,13 +1,51 @@
 -module(util).
 -compile(export_all).
+-export([start/0,stop/0,create_db/0,status/0]).
 
-make()->
-	lists:map(fun (X)->c:c(X,[compressed])end,
-		[syncserver,net_interface,db_impl_mnesia,db_interface]).
+%% start() -> boolean()
+start()->
+	Apps=apps_list(),
+	error_logger:info_msg("Util: starting applications: ~p~n",[Apps]),
+	lists:foreach(fun ensure_running/1, Apps),
+	status().
 
-start()->	syncserver:start().
-stop()->	syncserver:stop().
+%% stop() -> void()
+stop()->
+	error_logger:info_msg("Util: stopping node~n",[]),
+	init:stop().
 
+%% status() -> boolean()
+status()->
+	R=is_running(syncserver),
+	error_logger:info_msg("Util: status: ~p~n",[R]),
+	R.
+
+%% create_db() -> ok | {error,Reason}
 create_db()->
-	db_impl_mnesia:init().
+	R=db_impl_mnesia:init(),
+	error_logger:info_msg("Util: create_db: ~p~n",[R]),
+	R.
+
+ensure_running(Application)->
+	Running=is_running(Application),
+	if	Running -> 
+			error_logger:info_msg(
+				"Util: ensure_running: ~p is running~n",[Application]),
+			ok;
+		true ->
+			R=application:start(Application),
+			error_logger:info_msg(
+				"Util: ensure_running: start ~p : ~p~n",[Application,R]),
+			R
+	end.
+
+apps_list()->
+	application:load(syncserver),
+	{ok,Deps}=application:get_key(syncserver,applications),
+	Deps++[syncserver].
+
+is_running(Application)->
+	lists:member(Application,
+		lists:map(fun({A,_,_}) -> A end,application:which_applications())).
+
 

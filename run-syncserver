@@ -1,6 +1,4 @@
 #!/bin/sh
 
-test -z "$TARGET" && TARGET=target
-
-SYNCSERVERWORKDIR=$TARGET $TARGET/etc/init.d/syncserver $*
+target/etc/init.d/syncserver $1 --workdir target --no-su
 
