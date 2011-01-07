@@ -14,8 +14,9 @@ WORK_DIR=/
 print_help(){
 	echo "Synchronization Server control script"
 	echo "Usage:"
-	echo " $0 start|stop|status|reload|"
-	echo "    |force-reload|create-db|create-cookie  [--workdir DIR] [--no-su]"
+	echo " $0 start|stop|status|reload|force-reload|"
+	echo -n "    |create-db|create-cookie|create-cookie-force "
+	echo " [--workdir DIR] [--no-su]"
 }
 
 if [ $# -eq 0 ] ; then

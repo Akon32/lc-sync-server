@@ -19,9 +19,6 @@ make clean
 make fullclean
 
 Установка.
- ! Сейчас после установки сервера придется запускать его c правами
- ! суперпользователя, что не рекомендуется делать. 
- ! В дальнейшем это будет исправлено.
 	Установка необязательна, можно запускать сервер из каталога target.
 	ДЛя установки выполните команду:
 sudo make install
@@ -40,8 +37,10 @@ sudo make purge
 	
 	Создание БД:
 ./run-syncserver create-db
-	Создание cookie (настоятельно рекомендуется сделать это):
+	Создание cookie:
 ./run-syncserver create-cookie
+	Перезапись существующего cookie:
+./run-syncserver create-cookie-force
 	Для запуска Syncserver'а выполните:
 ./run-syncserver start
 	Останов сервера:
