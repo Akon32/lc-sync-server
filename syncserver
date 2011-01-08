@@ -14,7 +14,7 @@ WORK_DIR=/
 print_help(){
 	echo "Synchronization Server control script"
 	echo "Usage:"
-	echo " $0 start|stop|status|reload|force-reload|"
+	echo " $0 start|stop|status|restart|force-reload|"
 	echo -n "    |create-db|create-cookie|create-cookie-force "
 	echo " [--workdir DIR] [--no-su]"
 }
@@ -118,7 +118,7 @@ print_ok_fail(){
 
 status(){
 	echo -n "Checking SyncServer status.."
-	ctl "$STATUS_SCRIPT"
+	ctl "$STATUS_SCRIPT" >/dev/null
 	R=$?
 	if [ "$R" -eq 0 ];then
 		echo " OK"
@@ -148,7 +148,7 @@ start_server(){
 	fi
 }
 
-reload(){
+restart(){
 	stop_server
 	start_server
 }
@@ -181,8 +181,8 @@ case $ARG1 in
 	stop)
 	    stop_server
 	;;
-	reload|force-reload)
-		reload
+	restart|force-reload)
+		restart
 	;;
 	create-db)
 	    create_db
