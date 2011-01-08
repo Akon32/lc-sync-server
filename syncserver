@@ -179,10 +179,19 @@ create_db(){
 }
 
 create_cookie(){
-	{ cat /dev/urandom|head -c32|md5sum|head -c32 > $COOKIE_FILE
-	} &&	chmod 440 $COOKIE_FILE && \
-		chown $SYNCSERVER_USER:$SYNCSERVER_USER $COOKIE_FILE && \
+	cat /dev/urandom|head -c32|md5sum|head -c32 > $COOKIE_FILE
+	R=$?
+	if [ $R -eq 0 ] ;then
 		echo "Cookie file created."
+		if [ -z "$NO_SU" ] ;then 
+			chmod 440 $COOKIE_FILE && \
+				chown $SYNCSERVER_USER:$SYNCSERVER_USER $COOKIE_FILE
+		fi
+		return 0
+	else
+		echo "Creating cookie: FAIL"
+		return 1
+	fi
 }
 
 case $ARG1 in
