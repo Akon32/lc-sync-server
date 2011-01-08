@@ -60,4 +60,6 @@ sudo make purge
 ./run-syncserver stop
 	Проверка статуса:
 ./run-syncserver status
+	Отладка:
+./run-syncserver debug
 

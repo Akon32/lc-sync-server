@@ -14,9 +14,9 @@ WORK_DIR=/
 print_help(){
 	echo "Synchronization Server control script"
 	echo "Usage:"
-	echo " $0 start|stop|status|restart|force-reload|"
-	echo -n "    |create-db|create-cookie|create-cookie-force "
-	echo " [--workdir DIR] [--no-su]"
+	echo " $0 <COMMAND> [--workdir DIR] [--no-su]"
+	echo "where <COMMAND> = start | stop | status | restart | force-reload | debug |"
+	echo "                | create-db | create-cookie | create-cookie-force"
 }
 
 if [ $# -eq 0 ] ; then
@@ -194,6 +194,13 @@ create_cookie(){
 	fi
 }
 
+debug(){
+	echo "Attaching Erlang shell to node $SNAME."
+	echo "To detach it, press: Ctrl+G, q, Return"
+	echo ""
+	exec erl -sname $CONTROL_SNAME $COOKIE_OPT -remsh $SNAME
+}
+
 case $ARG1 in
 	status)
 		status || true
@@ -221,6 +228,9 @@ case $ARG1 in
 		else
 			create_cookie
 		fi
+	;;
+	debug)
+		debug
 	;;
 	*)
 		print_help
