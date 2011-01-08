@@ -45,6 +45,7 @@ installfiles: build
 	cp -r $(BUILD_PATH)/* $(INSTALL_PATH)/
 
 uninstall:
+	if test -x "$(SCRIPT)" ; then invoke-rc.d syncserver stop ; fi
 	rm -rf $(INSTALL_PATH)/usr/share/syncserver
 	rm -rf $(INSTALL_PATH)/etc/syncserver
 	rm -f  $(INSTALL_PATH)/etc/init.d/syncserver

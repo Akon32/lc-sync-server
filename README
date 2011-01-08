@@ -20,7 +20,6 @@ sudo invoke-rc.d syncserver create-db
 sudo invoke-rc.d syncserver start
 	Сервер будет запускаться при старте системы.
 	Полное удаление:
-sudo invoke-rc.d syncserver stop
 cd lc-sync-server
 sudo make purge
 
