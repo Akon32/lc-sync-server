@@ -16,7 +16,6 @@ git clone git://github.com/Akon32/lc-sync-server.git
 cd lc-sync-server
 sudo make install
 sudo make fullclean
-sudo invoke-rc.d syncserver create-db
 sudo invoke-rc.d syncserver start
 	Сервер будет запускаться при старте системы.
 	Полное удаление:
@@ -49,9 +48,9 @@ sudo make purge
 'sudo invoke-rc.d syncserver'. Если сервер не установлен в систему, 
 его можно запустить через './run-syncserver'.
 	
-	Создание БД:
+	Создание БД (выполняется при установке автоматически):
 ./run-syncserver create-db
-	Создание cookie:
+	Создание cookie (выполняется при установке автоматически):
 ./run-syncserver create-cookie
 	Перезапись существующего cookie:
 ./run-syncserver create-cookie-force

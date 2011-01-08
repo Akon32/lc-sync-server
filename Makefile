@@ -37,9 +37,8 @@ clean:
 install: build installfiles mkuser
 	echo "SyncServer\`s files are installed."
 	update-rc.d syncserver defaults
-	echo "test.."
-	$(SCRIPT) create-cookie || true
-	echo "You should create database before starting server"
+	invoke-rc.d syncserver create-cookie || true
+	invoke-rc.d syncserver create-db || true
 
 installfiles: build 
 	cp -r $(BUILD_PATH)/* $(INSTALL_PATH)/

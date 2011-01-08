@@ -69,9 +69,11 @@ STATUS_SCRIPT="
 
 CREATE_DB_SCRIPT="
 	R=rpc:call('$SNAME',util,create_db,[]),
-	if	R==ok -> init:stop(0);
-		true -> init_stop(1)
-	end."
+	init:stop(case R of 
+		ok -> 0;
+		already_exists -> 2;
+		_-> 1
+	end)."
 
 as_syncserver(){
 	if [ -z "$NO_SU" ]; then
@@ -88,7 +90,7 @@ test -z $COOKIE && COOKIE_OPT=
 
 ERL_OPTIONS="-detached -pa $ERL_PATH -sname $SNAME -config $CONFIG_FILE $COOKIE_OPT"
 ERL_OPTIONS_CONTROL="-noshell -sname $CONTROL_SNAME $COOKIE_OPT"
-ERL_OPTIONS_CREATEDB="-noshell -pa $ERL_PATH -sname $CONTROL_SNAME -config $CONFIG_FILE $COOKIE_OPT"
+#ERL_OPTIONS_CREATEDB="-noshell -pa $ERL_PATH -sname $CONTROL_SNAME -config $CONFIG_FILE $COOKIE_OPT"
 
 #запуск рабочего узла
 startnode(){
@@ -159,18 +161,30 @@ create_db(){
 		echo " FAIL: Syncserver is running"
 		return 1
 	fi
-	#TODO: надо проверять дополнительно, не запущен ли узел $SNAME,
-	# или mnesia в каталоге mnesia dir..
-	# часто в этом месте erl падает
-	{ startnode && ctl "$CREATE_DB_SCRIPT" && stopnode ; } >/dev/null
-	print_ok_fail "$?"
+	if startnode ;then
+		ctl "$CREATE_DB_SCRIPT" >/dev/null
+		R=$?
+		stopnode
+		case $R in
+			0)	echo " OK";
+				return 0 ;;
+			2)	echo " already exists" ;
+				return 0 ;;
+			*)	echo " FAIL" ;
+				return 1 ;;
+		esac
+	else
+		echo " FAIL" ; return 3
+	fi
 }
+
 create_cookie(){
 	{ cat /dev/urandom|head -c32|md5sum|head -c32 > $COOKIE_FILE
 	} &&	chmod 440 $COOKIE_FILE && \
 		chown $SYNCSERVER_USER:$SYNCSERVER_USER $COOKIE_FILE && \
 		echo "Cookie file created."
 }
+
 case $ARG1 in
 	status)
 		status || true

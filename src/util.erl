@@ -20,11 +20,14 @@ status()->
 	error_logger:info_msg("Util: status: ~p~n",[R]),
 	R.
 
-%% create_db() -> ok | {error,Reason}
+%% create_db() -> ok | already_exists | {error,Reason}
 create_db()->
 	R=db_impl_mnesia:init(),
 	error_logger:info_msg("Util: create_db: ~p~n",[R]),
-	R.
+	case R of 
+		{error,{_,{already_exists,_}}} -> already_exists;
+		A -> A
+	end.
 
 ensure_running(Application)->
 	Running=is_running(Application),
