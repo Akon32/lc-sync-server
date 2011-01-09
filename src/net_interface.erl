@@ -1,10 +1,7 @@
 -module(net_interface).
--export([send/2,recv/1,sendm/2,receivem/1,list2int/1,int2list/1]).
+-export([send/2,recv/1,sendm/2,receivem/1]).
 -export([handler_thread/2,server_start/1,init/1]).
--import(lists,[map/2,flatten/1,sublist/3,split/2,nthtail/2]).
 -define(read_timeout,infinity).
--define(msg_head_maxlistcount,1).
--define(msg_head_maxlistlength,256).
 
 server_start(Callback)->
 	{ok,spawn_link(fun()->
@@ -60,46 +57,16 @@ recv(S)->
 	Packet.
 
 sendm(S,Msg)->
-	Bytes=marshal(Msg),
+	Bytes=util:marshal(Msg),
 	error_logger:info_msg("SENDM thread:~p socket:~p sublists:~p bytes:~p~nmsg head:~p~n",
-		[self(),S,length(Msg),length(Bytes),msg_head(Msg)]),
+		[self(),S,length(Msg),length(Bytes),util:msg_head(Msg)]),
 	send(S,Bytes).
 
 receivem(S)->
 	Bytes=recv(S),
-	Msg=unmarshal(Bytes),
+	Msg=util:unmarshal(Bytes),
 	error_logger:info_msg("RECEIVEM thread:~p socket:~p sublists:~p bytes:~p~nmsg head:~p~n",
-		[self(),S,length(Msg),length(Bytes),msg_head(Msg)]),
+		[self(),S,length(Msg),length(Bytes),util:msg_head(Msg)]),
 	Msg.
 
-msg_head(Msg)->
-	lists:map(fun(X)->
-		lists:sublist(X,?msg_head_maxlistlength)
-	end,lists:sublist(Msg,?msg_head_maxlistcount)).
-
-marshal(List) ->
-	L = int2list(length(List)),
-	LS = map(fun (X)->int2list(length(X)) end,List),
-	L ++ flatten(LS) ++ flatten(List).
-
-unmarshal(List)->
-	L = list2int(sublist(List,1,4)),
-	LS = lengths(sublist(List,1+4,4*L)),
-	extractLists(LS,nthtail(4*(L+1),List)).
-
-extractLists([],[])->[];
-extractLists([L|LS],XS)->
-	{X,Rest}=split(L,XS),
-	[X|extractLists(LS,Rest)].
-
-lengths([])->[];
-lengths(XS)->
-	{V,Rest}=split(4,XS),
-	[list2int(V)|lengths(Rest)].
-
-list2int(L)->
-	<<I:32/integer>> =list_to_binary(L), I.
-	
-int2list(I)->
-	binary_to_list(<<I:32/integer>>).
 

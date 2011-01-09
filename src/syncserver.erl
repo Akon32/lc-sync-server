@@ -2,7 +2,7 @@
 -export([start/2,stop/1,init/1]).
 -export([start_user_list/0]).
 -import(db_interface,[db_access/1]).
--import(net_interface,[list2int/1,int2list/1]).
+-import(util,[list2int/1,int2list/1]).
 -import(net_interface,[sendm/2,receivem/1]).
 -behaviour(application).
 -behaviour(supervisor).
