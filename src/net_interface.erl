@@ -3,6 +3,8 @@
 -export([handler_thread/2,server_start/1,init/1]).
 -import(lists,[map/2,flatten/1,sublist/3,split/2,nthtail/2]).
 -define(read_timeout,infinity).
+-define(msg_head_maxlistcount,1).
+-define(msg_head_maxlistlength,256).
 
 server_start(Callback)->
 	{ok,spawn_link(fun()->
@@ -48,23 +50,32 @@ handler_thread(Callback,Socket)->
 		end)}.
 
 send(S,Msg)->
-	error_logger:info_msg("SEND thread:~p socket:~p~ndata:~p~n",[self(),S,Msg]),
+%	error_logger:info_msg("SEND thread:~p socket:~p~ndata:~p~n",[self(),S,Msg]),
 	gen_tcp:send(S,Msg).
 
 recv(S)->
 % "The Length argument is only meaningful when the socket is in raw mode"
 	{ok,Packet} = gen_tcp:recv(S,0,?read_timeout),
-	error_logger:info_msg("RECV thread:~p socket:~p~ndata:~p~n",[self(),S,Packet]),
+%	error_logger:info_msg("RECV thread:~p socket:~p~ndata:~p~n",[self(),S,Packet]),
 	Packet.
 
 sendm(S,Msg)->
-	error_logger:info_msg("SENDM thread:~p socket:~p~nmsg:~p~n",[self(),S,Msg]),
-	send(S,marshal(Msg)).
+	Bytes=marshal(Msg),
+	error_logger:info_msg("SENDM thread:~p socket:~p sublists:~p bytes:~p~nmsg head:~p~n",
+		[self(),S,length(Msg),length(Bytes),msg_head(Msg)]),
+	send(S,Bytes).
 
 receivem(S)->
-	R=unmarshal(recv(S)),
-	error_logger:info_msg("RECEIVEM thread:~p socket:~p~nmsg:~p~n",[self(),S,R]),
-	R.
+	Bytes=recv(S),
+	Msg=unmarshal(Bytes),
+	error_logger:info_msg("RECEIVEM thread:~p socket:~p sublists:~p bytes:~p~nmsg head:~p~n",
+		[self(),S,length(Msg),length(Bytes),msg_head(Msg)]),
+	Msg.
+
+msg_head(Msg)->
+	lists:map(fun(X)->
+		lists:sublist(X,?msg_head_maxlistlength)
+	end,lists:sublist(Msg,?msg_head_maxlistcount)).
 
 marshal(List) ->
 	L = int2list(length(List)),
