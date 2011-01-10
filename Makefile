@@ -36,6 +36,8 @@ clean:
 
 install: build installfiles mkuser
 	echo "SyncServer\`s files are installed."
+	chown syncserver:syncserver /var/log/syncserver/
+	chmod 770 /var/log/syncserver/
 	update-rc.d syncserver defaults
 	invoke-rc.d syncserver create-cookie || true
 	invoke-rc.d syncserver create-db || true
