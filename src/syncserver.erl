@@ -61,9 +61,14 @@ start_user_list()->
 % реализация мьютекса для каждого имени пользователя
 user_list(US)->
 	receive
+		% удаление пользователя из списка подключенных пользователей
 		{release,User}->
 			error_logger:info_msg("User list: release user ~p~n",[User]),
 			user_list(lists:delete(User,US));
+		% добавление пользователя в список подлюченных пользователей.
+		% Отправителю отсылается true, если пользователь уже в списке;
+		% и false, если пользователь не был в списке, в этом случае 
+		% пользователь добавляется в список.
 		{Sender,{check_add,User}}->
 			user_list(
 				case Sender!lists:member(User,US) of
