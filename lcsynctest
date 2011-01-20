@@ -1,0 +1,101 @@
+#!/usr/bin/env escript 
+-import(lists,[map/2,flatten/1,sublist/3,sublist/2,split/2,nthtail/2]).
+
+main(Args)->
+	set_defaults(),
+	ok=parse_args(Args),
+	ok=connect(),
+	try
+		keyboard()
+	after
+		disconnect()
+	end.
+
+set_defaults()->
+	put(port,1024),
+	put(host,"localhost").
+
+parse_args([])->ok;
+parse_args(["--port",P|T])->
+	put(port,list_to_integer(P)),
+	parse_args(T);
+parse_args(["--host",H|T])->
+	put(host,H),
+	parse_args(T);
+parse_args(Args)->
+	io:format("Wrong args: ~p~n",[Args]),
+	{wrong_args,Args}.
+
+connect()->
+	{ok,S}=gen_tcp:connect(get(host),get(port),
+		[list,{active,false},{packet,4}]),
+	put(socket,S),
+	ok.
+
+disconnect()->
+	gen_tcp:close(get(socket)).
+
+keyboard()->
+	case read_message() of
+		[] -> done;
+		M ->
+			ok=send_message(M),
+			net()
+	end.
+
+net()->
+	case recv_message() of
+		[] -> done;
+		M ->
+			write_message(M),
+			keyboard()
+	end.
+
+read_message()->
+	case io:get_line("") of
+		"\n" -> [];
+		Str when is_list(Str) andalso length(Str)>1 -> 
+			Str2=lists:sublist(Str,length(Str)-1),
+			[process_string(Str2) | read_message()];
+		_ -> []
+	end.
+
+process_string(S)->S.
+
+write_message(M)->
+	io:format("~p~n",[M]).
+
+recv_message()->
+	{ok,P}=gen_tcp:recv(get(socket),0),
+	unmarshal(P).
+
+send_message(M)->
+	ok=gen_tcp:send(get(socket),marshal(M)).
+
+% from util.erl
+marshal(List) ->
+	L = int2list(length(List)),
+	LS = map(fun (X)->int2list(length(X)) end,List),
+	L ++ flatten(LS) ++ flatten(List).
+
+unmarshal(List)->
+	L = list2int(sublist(List,1,4)),
+	LS = lengths(sublist(List,1+4,4*L)),
+	extractLists(LS,nthtail(4*(L+1),List)).
+
+extractLists([],[])->[];
+extractLists([L|LS],XS)->
+	{X,Rest}=split(L,XS),
+	[X|extractLists(LS,Rest)].
+
+lengths([])->[];
+lengths(XS)->
+	{V,Rest}=split(4,XS),
+	[list2int(V)|lengths(Rest)].
+
+list2int(L)->
+	<<I:32/integer>> =list_to_binary(L), I.
+	
+int2list(I)->
+	binary_to_list(<<I:32/integer>>).
+
