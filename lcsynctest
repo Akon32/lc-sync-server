@@ -60,7 +60,23 @@ read_message()->
 		_ -> []
 	end.
 
-process_string(S)->S.
+process_string([])->[];
+process_string([$\\])->[$\\];
+process_string([$\\,$x,Dh,Dl|T]) ->
+	case erlang:list_to_integer([Dh,Dl],16) of
+		D when is_integer(D) ->
+			[D];
+		_ -> [$\\,$x,Dh,Dl]
+	end ++ process_string(T);
+process_string([$\\,C|T])->
+	case [C] of
+		"n" -> "\n";
+		"t" -> "\t";
+		"0" -> [0];
+		_ -> [$\\,C]
+	end ++ process_string(T);
+process_string([H|T])->
+	[H|process_string(T)].
 
 write_message(M)->
 	io:format("~p~n",[M]).
