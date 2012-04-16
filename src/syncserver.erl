@@ -1,6 +1,5 @@
 -module(syncserver).
 -export([start/2,stop/1,init/1]).
--export([start_user_list/0]).
 -import(db_interface,[db_access/1]).
 -import(util,[list2int/1,int2list/1]).
 -import(net_interface,[sendm/2,receivem/1]).
@@ -38,9 +37,6 @@ stop(_State)->
 
 init(Args) ->
 	{ok,{{one_for_one, 3, 10},[
-		{user_list,
-			{syncserver,start_user_list,[]},
-			transient,brutal_kill,worker,[]},
 		{connection_handler_pool,
 			% может {global,connection_handlers} ?
 			{supervisor,start_link,[{local,connection_handlers},net_interface,Args]},
@@ -49,40 +45,6 @@ init(Args) ->
 			{net_interface,server_start,[fun login/1]},
 			permanent,brutal_kill,worker,[]}
 	]}}.
-
-start_user_list()->
-	{ok,spawn_link(
-		fun()->
-			register(user_list,self()),
-			error_logger:info_msg("User list: started in ~p~n",[self()]),
-			user_list([])
-		end)}.
-
-% реализация мьютекса для каждого имени пользователя
-user_list(US)->
-	receive
-		% удаление пользователя из списка подключенных пользователей
-		{release,User}->
-			error_logger:info_msg("User list: release user ~p~n",[User]),
-			user_list(lists:delete(User,US));
-		% добавление пользователя в список подлюченных пользователей.
-		% Отправителю отсылается true, если пользователь уже в списке;
-		% и false, если пользователь не был в списке, в этом случае 
-		% пользователь добавляется в список.
-		{Sender,{check_add,User}}->
-			user_list(
-				case Sender!lists:member(User,US) of
-					true->
-						error_logger:info_msg("User list: check_add user ~p: already connected~n",[User]),
-						US;
-					false->
-						error_logger:info_msg("User list: check_add user ~p: added to list~n",[User]),
-						[User|US]
-				end);
-		M -> 
-			error_logger:warning_msg("User list: unhandled message: ~p~n",[M]),
-			user_list(US)
-	end.
 
 login(Socket)->
 	error_logger:info_msg("Handler: ~p in LOGIN state~n",[self()]),
@@ -161,16 +123,12 @@ do_login(S,User,Password)->
 	error_logger:info_msg("Login: trying to login as user ~p..~n",[User]),
 	NotExists = not db_access({user_exists,User}),
 	OrWrongPassword = NotExists orelse Password =/= db_access({get_password,User}),
-	OrConnected = OrWrongPassword orelse lib:sendw(user_list,{check_add,User}),
 	if	NotExists -> 
 			error_logger:info_msg("Login: user ~p don`t exists~n",[User]),
 			sendm(S,?err_user_not_registered);
 		OrWrongPassword -> 
 			error_logger:info_msg("Login: wrong password for user ~p~n",[User]),
 			sendm(S,?err_password);
-		OrConnected -> 
-			error_logger:info_msg("Login: user ~p is already connected~n",[User]),
-			sendm(S,?err_already_connected);
 		true ->
 			sendm(S,[?ok_text]),
 			error_logger:info_msg("Login: ~p logined as user ~p~n",[self(),User]),
@@ -180,7 +138,6 @@ do_login(S,User,Password)->
 				running()
 			after
 				error_logger:info_msg("Login: user ~p disconnected~n",[User]),
-				user_list!{release,User},
 				erase(socket),
 				erase(user)
 			end
